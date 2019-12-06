@@ -45,7 +45,7 @@ bool CPU::ExecuteNext()
 
 void CPU::Ensure(int s)
 {
-    if (s < 0 || s > m_ram.size())
+    if (s < 0 || s >= m_ram.size())
     {
         throw new exception("Invalid Address");
     }

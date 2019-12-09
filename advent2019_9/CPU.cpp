@@ -32,6 +32,7 @@ CPU::CPU(CPU::Ram& ram,
     m_dispatch[6] = &CPU::JF;
     m_dispatch[7] = &CPU::LT;
     m_dispatch[8] = &CPU::EQ;
+    m_dispatch[9] = &CPU::ADB;
     m_dispatch[99] = &CPU::END;
 }
 
@@ -71,9 +72,9 @@ void CPU::Ensure(CPU::MemType s)
         throw new exception("Invalid Address");
     }
 
-    if (s > m_ram.size())
+    if (s >= m_ram.size())
     {
-        m_ram.resize(s);
+        m_ram.resize(0x1000 + (s & ~0xfff));
     }
 }
 
@@ -92,6 +93,10 @@ CPU::MemType CPU::GetNextOperand()
     case 1:
         // Immediate
         return operand;
+    case 2:
+        // Based
+        Ensure(operand + m_base);
+        return m_ram[operand + m_base];
     default:
         throw new exception("Invalid Mode for Read");
     }
@@ -109,6 +114,11 @@ void CPU::SetNextOperand(CPU::MemType val)
         // Address
         Ensure(operand);
         m_ram[operand] = val;
+        return;
+    case 2:
+        // Based
+        Ensure(operand + m_base);
+        m_ram[operand + m_base] = val;
         return;
     default:
         throw new exception("Invalid Mode for Write");
@@ -194,6 +204,13 @@ void CPU::EQ()
 
     CPU::MemType d = (s1 == s2) ? 1 : 0;
     SetNextOperand(d);
+}
+
+void CPU::ADB()
+{
+    Log("ADB");
+    CPU::MemType s1 = GetNextOperand();
+    m_base += s1;
 }
 
 void CPU::END()

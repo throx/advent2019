@@ -44,6 +44,7 @@ protected:
     void JF();
     void LT();
     void EQ();
+    void ADB();
 
     void END();
 

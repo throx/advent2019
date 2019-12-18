@@ -15,7 +15,7 @@
 using namespace std;
 
 typedef vector<string> Map;
-typedef set<char> Keys;
+typedef vector<bool> Keys;
 typedef list<char> Path;
 typedef Point<int, 2> Point2;
 
@@ -46,8 +46,9 @@ vector<bool> g_done;
 vector<bool> g_zero;
 int g_best = INT_MAX;
 int g_numkeys = 0;
+vector<vector<int> > g_dist(26, vector<int>(26));
 
-Infos GetItems(const Map& m, const Point2& pos)
+Infos GetItems(const Map& m, const Point2& pos, const Keys& keys)
 {
     // Flood fill
     struct Data { Point2 where; int dist; };
@@ -63,16 +64,20 @@ Infos GetItems(const Map& m, const Point2& pos)
         todo.pop_back();
         g_done[i.where[0] + g_max[0] * i.where[1]] = true;
         if (IsKey(c) || IsDoor(c)) {
-            result.push_back(Info{ c, i.dist, i.where });
+            if (!keys[tolower(c) - 'a']) {
+                if (IsKey(c)) {
+                    result.push_back(Info{ c, i.dist, i.where });
+                }
+                continue;
+            }
         }
-        else {
-            for (auto dir : DIRS) {
-                Point2 newpos = i.where + dir;
-                if (newpos.InBounds(g_max)) {
-                    if (!g_done[newpos[0] + g_max[0] * newpos[1]]) {
-                        if (m[newpos[1]][newpos[0]] != '#') {
-                            todo.push_back(Data{ newpos, i.dist + 1 });
-                        }
+
+        for (auto dir : DIRS) {
+            Point2 newpos = i.where + dir;
+            if (newpos.InBounds(g_max)) {
+                if (!g_done[newpos[0] + g_max[0] * newpos[1]]) {
+                    if (m[newpos[1]][newpos[0]] != '#') {
+                        todo.push_back(Data{ newpos, i.dist + 1 });
                     }
                 }
             }
@@ -81,20 +86,62 @@ Infos GetItems(const Map& m, const Point2& pos)
     return result;
 }
 
+vector<int> GetDist(const Map& m, const Point2& pos)
+{
+    struct Data { Point2 where; int dist; };
+    vector<Data> todo;
+    todo.reserve(1000);
+    todo.push_back(Data{ pos, 0 });
+    g_done = g_zero;
+    vector<int> result;
+    result.resize(26);
+
+    while (!todo.empty())
+    {
+        auto i = todo.back();
+        char c = m[i.where[1]][i.where[0]];
+        todo.pop_back();
+        g_done[i.where[0] + g_max[0] * i.where[1]] = true;
+
+        for (auto dir : DIRS) {
+            Point2 newpos = i.where + dir;
+            if (newpos.InBounds(g_max)) {
+                if (!g_done[newpos[0] + g_max[0] * newpos[1]]) {
+                    char c = m[newpos[1]][newpos[0]];
+                    if (c != '#') {
+                        todo.push_back(Data{ newpos, i.dist + 1 });
+                    }
+                    if (IsKey(c)) {
+                        result[c - 'a'] = i.dist + 1;
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
 int GetMinDistIterative(const Map& m, const Point2& pos, Path& bestpath)
 {
+    int best = 0;
+
     struct ToDo {
-        Map m;
         Keys keys;
         Point2 pos;
-        Path path;
         int dist;
+        int minleft;
         // Only good for heaps, not stuff that needs strict less
-        bool operator< (const ToDo& other) const { return dist > other.dist; }
+        bool operator< (const ToDo& other) const { return (dist + minleft*0.55) > (other.dist + other.minleft*0.55); }
     };
     vector<ToDo> todo;
 
-    todo.push_back(ToDo{ m, Keys(), pos, Path(), 0 });
+    Keys keys;
+    keys.resize(26);
+    int md = 0;
+    for (int i = 0; i < 25; ++i) md += g_dist[i][i + 1];
+    todo.push_back(ToDo{ keys, pos, 0, md });
+
     make_heap(todo.begin(), todo.end());
     while (!todo.empty()) {
 
@@ -102,89 +149,40 @@ int GetMinDistIterative(const Map& m, const Point2& pos, Path& bestpath)
         pop_heap(todo.begin(), todo.end());
         todo.pop_back();
 
-        Infos infos = GetItems(item.m, item.pos);
+        int nk = 0;
+        for (const auto& x : item.keys) if (x) ++nk;
+        if (best < nk) {
+            cout << nk << ": " << todo.size() << endl;
+            best = nk;
+        }
+
+        Infos infos = GetItems(m, item.pos, item.keys);
         if (infos.empty()) {
-            bestpath = item.path;
             return item.dist;
         }
 
         for (const auto& info : infos) {
             if (IsKey(info.item)) {
                 ToDo newitem(item);
-                newitem.m[info.pos[1]][info.pos[0]] = '.';
-                newitem.keys.insert(info.item);
-                newitem.path.push_back(info.item);
+                newitem.keys[info.item - 'a'] = true;
+                newitem.minleft = 0;
+                int j = 0;
+                for (int i = 1; i < 26; ++i) {
+                    if (!newitem.keys[i]) {
+                        newitem.minleft += g_dist[i][j];
+                        j = i;
+                    }
+                }
                 newitem.pos = info.pos;
                 newitem.dist += info.dist;
                 todo.push_back(newitem);
                 push_heap(todo.begin(), todo.end());
             }
-            else {
-                if (item.keys.find(tolower(info.item)) != item.keys.end()) {
-                    ToDo newitem(item);
-                    newitem.m[info.pos[1]][info.pos[0]] = '.';
-                    newitem.path.push_back(info.item);
-                    newitem.pos = info.pos;
-                    newitem.dist += info.dist;
-                    todo.push_back(newitem);
-                    push_heap(todo.begin(), todo.end());
-                }
-            }
         }
     }
 
     cout << "ERROR!!";
-}
-
-int GetMinDistRecursive(const Map& m, Keys keys, Point2 pos, int currdist, const Path& currpath)
-{
-    if (currdist > g_best) {
-        return g_best + 1;
-    }
-    Infos infos = GetItems(m, pos);
-    if (infos.empty()) {
-        if (g_best > currdist) {
-            g_best = currdist;
-            cout << g_best << ": ";
-            for (auto x : currpath) cout << x << ", ";
-            cout << endl;
-        }
-        return currdist;
-    }
-
-    // Try everything recursively
-    int mindist = INT_MAX;
-    make_heap(infos.begin(), infos.end());
-    while (!infos.empty()) {
-        const auto& info = infos.front();
-        int dist = mindist;
-        Path path(currpath);
-        Map newmap(m);
-        if (IsKey(info.item)) {
-            Keys newkeys(keys);
-            pos = info.pos;
-            newmap[pos[1]][pos[0]] = '.';
-            newkeys.insert(info.item);
-            path.push_back(info.item);
-            dist = GetMinDistRecursive(newmap, newkeys, pos, info.dist + currdist, path);
-        }
-        else {
-            if (keys.find(tolower(info.item)) != keys.end()) {
-                pos = info.pos;
-                newmap[pos[1]][pos[0]] = '.';
-                path.push_back(info.item);
-                dist = GetMinDistRecursive(newmap, keys, pos, info.dist + currdist, path);
-            }
-        }
-
-        if (dist < mindist) {
-            mindist = dist;
-        }
-        pop_heap(infos.begin(), infos.end());
-        infos.pop_back();
-    }
-
-    return mindist;
+    return -1;
 }
 
 int main()
@@ -208,6 +206,9 @@ int main()
             if (m[y][x] == '@') {
                 pos = Point2{ x, y };
                 m[y][x] = '.';
+            }
+            if (IsKey(m[y][x])) {
+                g_dist[m[y][x] - 'a'] = GetDist(m, Point2{ x, y });
             }
         }
     }

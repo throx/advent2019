@@ -77,7 +77,7 @@ public:
         }
     }
 
-    bool InBounds(const Point& max) {
+    bool InBounds(const Point& max) const {
         for (int i = 0; i < n; ++i) {
             if (m_coord[i] < 0 || m_coord[i] >= max.m_coord[i]) return false;
         }

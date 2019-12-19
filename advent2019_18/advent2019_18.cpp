@@ -98,36 +98,40 @@ KeyPathMap GetDist(const Map& m, const Point2& pos)
 {
     struct Data { Point2 where; int dist; set<char> doors; };
     vector<Data> todo;
+    vector<Data> todonext;
     todo.reserve(1000);
+    todonext.reserve(1000);
     todo.push_back(Data{ pos, 0 });
     g_done = g_zero;
     KeyPathMap result;
 
     while (!todo.empty())
     {
-        auto i = todo.back();
-        char c = m[i.where[1]][i.where[0]];
-        todo.pop_back();
-        g_done[i.where[0] + g_max[0] * i.where[1]] = true;
+        for (auto i : todo) {
+            char c = m[i.where[1]][i.where[0]];
+            g_done[i.where[0] + g_max[0] * i.where[1]] = true;
 
-        for (auto dir : DIRS) {
-            Point2 newpos = i.where + dir;
-            if (newpos.InBounds(g_max)) {
-                if (!g_done[newpos[0] + g_max[0] * newpos[1]]) {
-                    char c = m[newpos[1]][newpos[0]];
-                    set<char> doors = i.doors;
-                    if (IsKey(c)) {
-                        result[c] = KeyPath{ i.dist + 1, i.doors };
-                    }
-                    else if (IsDoor(c)) {
-                        doors.insert(tolower(c));
-                    }
-                    if (c != '#') {
-                        todo.push_back(Data{ newpos, i.dist + 1, doors });
+            for (auto dir : DIRS) {
+                Point2 newpos = i.where + dir;
+                if (newpos.InBounds(g_max)) {
+                    if (!g_done[newpos[0] + g_max[0] * newpos[1]]) {
+                        char c = m[newpos[1]][newpos[0]];
+                        set<char> doors = i.doors;
+                        if (IsKey(c)) {
+                            result[c] = KeyPath{ i.dist + 1, i.doors };
+                        }
+                        else if (IsDoor(c)) {
+                            doors.insert(tolower(c));
+                        }
+                        if (c != '#') {
+                            todonext.push_back(Data{ newpos, i.dist + 1, doors });
+                        }
                     }
                 }
             }
         }
+        todo = todonext;
+        todonext.clear();
     }
 
     return result;
@@ -150,7 +154,7 @@ int GetNoDoorDist(char start, const Keys& currkeys)
     }
 
     // Init queue with the starting pos at distance 0
-    int dist = 0;
+    int bestdist = INT_MAX;
     q.insert(make_pair(0, start));
 
     while (!q.empty()) {
@@ -158,7 +162,7 @@ int GetNoDoorDist(char start, const Keys& currkeys)
         // Grab shortest path off queue
         auto p = *q.cbegin();
         q.erase(q.cbegin());
-        dist = p.first;
+        int dist = p.first;
         char from = p.second;
 
         // Fill all distances from the queue point out to other 
@@ -178,7 +182,7 @@ int GetNoDoorDist(char start, const Keys& currkeys)
         }
     }
 
-    return dist;
+    return bestdist;
 }
 
 int FindShortestPathAStar(Path& bestpath)
@@ -318,6 +322,7 @@ int FindShortestPathDijkstra(Path& bestpath)
             cout << "Try " << item.dist << "? ";
             for (auto x : item.path) cout << x << ", ";
             cout << endl;
+            break;
         }
 
         // Play with counter
@@ -359,11 +364,19 @@ int FindShortestPathDijkstra(Path& bestpath)
             if (it == datamap.end()) {
                 q.insert(newitem);
                 datamap[mapindex] = newitem;
+
+                //cout << "Add " << next << " at dist " << newitem.dist << " with keys [";
+                //for (int x = 0; x < g_numkeys; ++x) if (newitem.keys[x]) cout << (char)('a'+x);
+                //cout << "]" << endl;
             }
             else if (it->second.dist > newitem.dist) {
                 q.erase(it->second);
                 q.insert(newitem);
                 datamap[mapindex] = newitem;
+
+                //cout << "Overwrite " << next << " at dist " << newitem.dist << " with keys [";
+                //for (int x = 0; x < g_numkeys; ++x) if (newitem.keys[x]) cout << (char)('a' + x);
+                //cout << "]" << endl;
             }
         }
     }
@@ -376,7 +389,7 @@ int main()
 {
     Map m;
 
-    ifstream f("Data2.txt");
+    ifstream f("Data.txt");
     while (!f.eof()) {
         string s;
         getline(f, s);

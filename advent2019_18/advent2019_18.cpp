@@ -181,7 +181,7 @@ int GetNoDoorDist(char start, const Keys& currkeys)
     return dist;
 }
 
-int FindShortestPath(Path& bestpath)
+int FindShortestPathAStar(Path& bestpath)
 {
     // A* - set up a queue, with heuristics
     struct Data {
@@ -277,11 +277,106 @@ int FindShortestPath(Path& bestpath)
     return item.dist;
 }
 
+int FindShortestPathDijkstra(Path& bestpath)
+{
+    // Dijkstra - set up a queue
+    struct Data {
+        int dist;
+        Path path;
+        Keys keys;
+        bool operator<(const Data& other) const {
+            if (dist == other.dist) {
+                if (keys == other.keys) {
+                    return dist < other.dist;
+                }
+                return keys < other.keys;
+            }
+            return dist < other.dist;
+        }
+    };
+
+    // Don't bother initing the datamap - assume no entry is infinite
+    map<pair<char, Keys>, Data> datamap;
+    set<Data> q;
+    const Keys allkeys(g_numkeys, true);
+
+    // Init queue with the starting pos at distance 0 and no keys
+    Data item{ 0, Path{'@'}, Keys(g_numkeys) };
+    q.insert(item);
+
+    // Some counters...
+    int count = 0;
+
+    while (!q.empty()) {
+
+        // Grab shortest path off queue
+        item = *q.cbegin();
+        q.erase(q.cbegin());
+
+        // Is it a winner?
+        if (item.keys == allkeys) {
+            cout << "Try " << item.dist << "? ";
+            for (auto x : item.path) cout << x << ", ";
+            cout << endl;
+        }
+
+        // Play with counter
+        ++count;
+        if (count % 100000 == 0) cout << count << "c: " << q.size() << item.dist << endl;
+
+        // Fill all distance from the queue point out to other points
+        // that we can get do (testing doors).
+        for (char next = 'a'; next < 'a' + g_numkeys; ++next) {
+
+            // If we already have the key, don't bother
+            if (item.keys[next - 'a']) continue;
+
+            // Get the adjacency item now we have (from, to)
+            char from = item.path.back();
+            auto index = make_pair(from, next);
+            const auto& kp = g_adjacency[index];
+
+            // Check the doors
+            bool all_doors = true;
+            for (const auto& d : kp.doors) {
+                if (!item.keys[d - 'a']) {
+                    all_doors = false;
+                    break;
+                }
+            }
+            if (!all_doors) continue;
+
+            // Compute new item
+            Data newitem(item);
+            newitem.dist += kp.dist;
+            newitem.keys[next - 'a'] = true;
+            newitem.path.push_back(next);
+
+            // If we have a new best distance, then remember it and
+            // push the result on queue
+            auto mapindex = make_pair(next, newitem.keys);
+            auto it = datamap.find(mapindex);
+            if (it == datamap.end()) {
+                q.insert(newitem);
+                datamap[mapindex] = newitem;
+            }
+            else if (it->second.dist > newitem.dist) {
+                q.erase(it->second);
+                q.insert(newitem);
+                datamap[mapindex] = newitem;
+            }
+        }
+    }
+
+    bestpath = item.path;
+    return item.dist;
+}
+
 int main()
 {
     Map m;
 
-    ifstream f("Data.txt");
+    ifstream f("Data2.txt");
     while (!f.eof()) {
         string s;
         getline(f, s);
@@ -310,7 +405,7 @@ int main()
     }
 
     Path path;
-    int dist = FindShortestPath(path);
+    int dist = FindShortestPathDijkstra(path);
     cout << "Min Dist = " << dist << endl;
     for (auto x : path) cout << x << ", ";
     cout << endl;

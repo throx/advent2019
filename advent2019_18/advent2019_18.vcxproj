@@ -155,6 +155,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Data.txt" />
+    <Text Include="Data2.txt" />
     <Text Include="Test1.txt" />
     <Text Include="Test2.txt" />
     <Text Include="Test3.txt" />

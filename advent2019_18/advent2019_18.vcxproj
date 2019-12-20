@@ -161,6 +161,10 @@
     <Text Include="Test3.txt" />
     <Text Include="Test4.txt" />
     <Text Include="Test5.txt" />
+    <Text Include="Test6.txt" />
+    <Text Include="Test7.txt" />
+    <Text Include="Test8.txt" />
+    <Text Include="Test9.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Point.h" />

@@ -1,29 +1,65 @@
 
-c = 0
+count1 = 0
+count2 = 0
+
+# Loop through the range given in my input
 for i in range(372304, 847061):
-  x = i
-  digits = []
-  ld = 10
+
+  # Store in another var, because we trash it
+  current = i
+
+  # Last digit we saw (to check decreasing)
+  lastdigit = 10
+
+  # Double check
   hasdouble = False
-  repct = 0
+  hasanydouble = False
+
+  # Repetition count
+  repcount = 0
+
+  # Are we seeing decreasing?
   decreasing = True
-  while x > 0:
-    d = x % 10
-    x = x // 10
-    if ld < d:
+
+  # Loop through the digits - note we're doing this
+  # right to left
+  while current > 0:
+
+    # Get the current digit ('ones')
+    digit = current % 10
+    current = current // 10
+
+    # Check we're decreasing
+    if lastdigit < digit:
       decreasing = False
       break
-    if ld == d:
-      repct = repct + 1
-    else:
-      if repct == 1:
-        hasdouble = True
-      repct = 0
-    ld = d
-  if repct == 1:
-    hasdouble = True
-  if hasdouble and decreasing:
-    c = c + 1
-    #print (i)
 
-print (c)
+    # Check for repetition
+    if lastdigit == digit:
+      repcount = repcount + 1
+    else:
+      # Check part1 and part2 double rules
+      if repcount == 1:
+        hasdouble = True
+      if repcount != 0:
+        hasanydouble = True
+
+      repcount = 0
+
+    # Remember last digit
+    lastdigit = digit
+
+  # Check double again (at end of loop)
+  if repcount == 1:
+    hasdouble = True
+  if repcount != 0:
+    hasanydouble = True
+
+  # If we've a double, and decreasing, then good to go
+  if hasanydouble and decreasing:
+    count1 = count1 + 1
+  if hasdouble and decreasing:
+    count2 = count2 + 1
+
+print ("Count 1 = ", count1)
+print ("Count 2 = ", count2)
